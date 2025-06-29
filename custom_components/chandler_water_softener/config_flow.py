@@ -211,8 +211,9 @@ class ChandlerWaterSoftenerOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
-            # User selected a device, update the config entry
+            # User selected a device and/or scan timeout, update the config entry
             selected_device = user_input["device"]
+            scan_timeout = user_input.get("scan_timeout", DEFAULT_SCAN_TIMEOUT)
             device_address = self.discovered_devices[selected_device]
             device_name = selected_device.split(" (")[0]
             return self.async_create_entry(
@@ -221,10 +222,11 @@ class ChandlerWaterSoftenerOptionsFlowHandler(config_entries.OptionsFlow):
                     **self.config_entry.options,
                     CONF_DEVICE_ADDRESS: device_address,
                     CONF_DEVICE_NAME: device_name,
+                    CONF_SCAN_TIMEOUT: scan_timeout,
                 },
             )
 
-        # Scan for all BLE devices
+        # Show scan timeout field and scan for all BLE devices
         scan_timeout = self.config_entry.options.get(CONF_SCAN_TIMEOUT, DEFAULT_SCAN_TIMEOUT)
         devices = await self.api.softener.scan_for_devices(timeout=scan_timeout)
         if not devices:
@@ -233,10 +235,12 @@ class ChandlerWaterSoftenerOptionsFlowHandler(config_entries.OptionsFlow):
             f"{device['name'] or 'Unknown'} ({device['address']})": device['address']
             for device in devices
         }
+        self.discovered_devices["Manual Entry"] = "MANUAL_ENTRY"
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Required("scan_timeout", default=scan_timeout): int,
                     vol.Required("device"): vol.In(list(self.discovered_devices.keys())),
                 }
             ),

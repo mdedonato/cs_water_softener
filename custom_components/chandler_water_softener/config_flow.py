@@ -32,6 +32,7 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self.api = ChandlerWaterSoftenerAPI()
         self.discovered_devices: dict[str, str] = {}
+        self.user_input: dict[str, Any] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -48,8 +49,9 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             )
 
-        # Start scanning for devices
-        return await self.async_step_scan(user_input)
+        # Store user input and start scanning for devices
+        self.user_input = user_input
+        return await self.async_step_scan()
 
     async def async_step_scan(
         self, user_input: dict[str, Any] | None = None
@@ -58,9 +60,8 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             # Start scanning
             try:
-                devices = await self.api.softener.scan_for_devices(
-                    timeout=user_input.get(CONF_SCAN_TIMEOUT, DEFAULT_SCAN_TIMEOUT)
-                )
+                scan_timeout = self.user_input.get(CONF_SCAN_TIMEOUT, DEFAULT_SCAN_TIMEOUT)
+                devices = await self.api.softener.scan_for_devices(timeout=scan_timeout)
                 
                 if not devices:
                     return self.async_show_form(
@@ -127,11 +128,11 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Create the config entry
             return self.async_create_entry(
-                title=user_input.get(CONF_NAME, device_name),
+                title=self.user_input.get(CONF_NAME, device_name),
                 data={
                     CONF_DEVICE_ADDRESS: device_address,
                     CONF_DEVICE_NAME: device_name,
-                    CONF_SCAN_TIMEOUT: user_input.get(CONF_SCAN_TIMEOUT, DEFAULT_SCAN_TIMEOUT),
+                    CONF_SCAN_TIMEOUT: self.user_input.get(CONF_SCAN_TIMEOUT, DEFAULT_SCAN_TIMEOUT),
                 },
             )
 

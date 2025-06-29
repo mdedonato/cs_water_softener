@@ -1,0 +1,14 @@
+{
+  "domain": "chandler_water_softener",
+  "name": "Chandler Water Softener",
+  "config_flow": true,
+  "documentation": "https://github.com/your-username/chandler-water-softener",
+  "requirements": ["bleak>=0.20.0"],
+  "ssdp": [],
+  "zeroconf": [],
+  "homekit": {},
+  "dependencies": [],
+  "codeowners": ["@your-username"],
+  "iot_class": "local_push",
+  "version": "1.0.0"
+} 

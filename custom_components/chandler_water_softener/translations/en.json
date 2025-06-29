@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Chandler Water Softener Setup",
+        "description": "Set up your Chandler CS_Meter_Soft water softener",
+        "data": {
+          "name": "Integration Name",
+          "scan_timeout": "Scan Timeout (seconds)"
+        }
+      },
+      "scan": {
+        "title": "Select Device",
+        "description": "Select your Chandler water softener device",
+        "data": {
+          "device": "Device"
+        }
+      }
+    },
+    "error": {
+      "no_devices_found": "No Chandler water softener devices found",
+      "scan_failed": "Failed to scan for devices",
+      "connection_failed": "Failed to connect to device"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "salt_level": {
+        "name": "Salt Level"
+      },
+      "water_usage": {
+        "name": "Water Usage"
+      },
+      "flow_rate": {
+        "name": "Flow Rate"
+      },
+      "hardness_setting": {
+        "name": "Hardness Setting"
+      },
+      "battery_level": {
+        "name": "Battery Level"
+      }
+    },
+    "binary_sensor": {
+      "regeneration_status": {
+        "name": "Regeneration Status"
+      },
+      "system_status": {
+        "name": "System Status"
+      }
+    }
+  }
+} 

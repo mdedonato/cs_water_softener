@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import aiohttp_client
 
 from .const import (
     CONF_DEVICE_ADDRESS,
@@ -75,9 +76,9 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         errors={"base": "no_devices_found"},
                     )
 
-                # Store discovered devices
+                # Show ALL discovered devices (not just Chandler)
                 self.discovered_devices = {
-                    f"{device['name']} ({device['address']})": device['address']
+                    f"{device['name'] or 'Unknown'} ({device['address']})": device['address']
                     for device in devices
                 }
 
@@ -150,4 +151,50 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_import(self, import_info: dict[str, Any]) -> FlowResult:
         """Handle import from configuration.yaml."""
-        return await self.async_step_user(import_info) 
+        return await self.async_step_user(import_info)
+
+
+class ChandlerWaterSoftenerOptionsFlowHandler(config_entries.OptionsFlow):
+    def __init__(self, config_entry):
+        self.config_entry = config_entry
+        self.api = ChandlerWaterSoftenerAPI()
+        self.discovered_devices = {}
+        self.user_input = {}
+
+    async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            # User selected a device, update the config entry
+            selected_device = user_input["device"]
+            device_address = self.discovered_devices[selected_device]
+            device_name = selected_device.split(" (")[0]
+            return self.async_create_entry(
+                title="",
+                data={
+                    **self.config_entry.options,
+                    CONF_DEVICE_ADDRESS: device_address,
+                    CONF_DEVICE_NAME: device_name,
+                },
+            )
+
+        # Scan for all BLE devices
+        scan_timeout = self.config_entry.options.get(CONF_SCAN_TIMEOUT, DEFAULT_SCAN_TIMEOUT)
+        devices = await self.api.softener.scan_for_devices(timeout=scan_timeout)
+        if not devices:
+            return self.async_abort(reason="no_devices_found")
+        self.discovered_devices = {
+            f"{device['name'] or 'Unknown'} ({device['address']})": device['address']
+            for device in devices
+        }
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("device"): vol.In(list(self.discovered_devices.keys())),
+                }
+            ),
+        )
+
+
+# Register the options flow
+async def async_get_options_flow(config_entry):
+    return ChandlerWaterSoftenerOptionsFlowHandler(config_entry) 

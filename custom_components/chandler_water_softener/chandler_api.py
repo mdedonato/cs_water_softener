@@ -30,12 +30,14 @@ class ChandlerWaterSoftener:
 
     async def scan_for_devices(self, timeout: int = 10) -> List[Dict[str, str]]:
         """Scan for Bluetooth LE devices, filtering for Chandler CS_Meter_Soft devices"""
-        _LOGGER.info(f"Scanning for Chandler CS_Meter_Soft devices for {timeout} seconds...")
+        _LOGGER.info(f"[SCAN] Scanning for Chandler CS_Meter_Soft devices for {timeout} seconds...")
 
         devices = await BleakScanner.discover(timeout=timeout)
+        _LOGGER.debug(f"[SCAN] Found {len(devices)} BLE devices.")
         chandler_devices = []
 
         for device in devices:
+            _LOGGER.debug(f"[SCAN] Device found: {device.name} ({device.address})")
             # Look specifically for CS_Meter_Soft or similar Chandler devices
             if device.name and any(keyword in device.name for keyword in
                                    ['CS_Meter_Soft', 'CS_Meter', 'chandler', 'Chandler']):
@@ -47,48 +49,49 @@ class ChandlerWaterSoftener:
                     'rssi': rssi
                 })
                 rssi_str = f" RSSI: {rssi}" if rssi is not None else ""
-                _LOGGER.info(f"Found Chandler device: {device.name} ({device.address}){rssi_str}")
+                _LOGGER.info(f"[SCAN] Found Chandler device: {device.name} ({device.address}){rssi_str}")
 
         if not chandler_devices:
-            _LOGGER.info("No CS_Meter_Soft devices found. Here are all discovered devices:")
+            _LOGGER.warning("[SCAN] No CS_Meter_Soft devices found. Here are all discovered devices:")
             for device in devices:
                 if device.name:
-                    _LOGGER.info(f"  {device.name} ({device.address})")
+                    _LOGGER.info(f"[SCAN]   {device.name} ({device.address})")
 
         return chandler_devices
 
     async def connect(self, device_address: str) -> bool:
         """Connect to the water softener device"""
         try:
-            _LOGGER.info(f"Connecting to device: {device_address}")
+            _LOGGER.info(f"[CONNECT] Connecting to device: {device_address}")
             self.client = BleakClient(device_address)
             await self.client.connect()
 
             if self.client.is_connected:
                 self.device_address = device_address
-                _LOGGER.info("Successfully connected!")
+                _LOGGER.info("[CONNECT] Successfully connected!")
                 await self._discover_services()
                 return True
             else:
-                _LOGGER.error("Failed to connect")
+                _LOGGER.error("[CONNECT] Failed to connect")
                 return False
 
         except Exception as e:
-            _LOGGER.error(f"Connection error: {str(e)}")
+            _LOGGER.error(f"[CONNECT] Connection error: {str(e)}")
             return False
 
     async def _discover_services(self):
         """Discover available services and characteristics"""
         if not self.client:
+            _LOGGER.warning("[DISCOVER] No client to discover services on.")
             return
 
-        _LOGGER.info("Discovering services and characteristics...")
+        _LOGGER.info("[DISCOVER] Discovering services and characteristics...")
         services = self.client.services
 
         for service in services:
-            _LOGGER.debug(f"Service: {service.uuid}")
+            _LOGGER.info(f"[DISCOVER] Service: {service.uuid}")
             for char in service.characteristics:
-                _LOGGER.debug(f"  Characteristic: {char.uuid} - Properties: {char.properties}")
+                _LOGGER.info(f"[DISCOVER]   Characteristic: {char.uuid} - Properties: {char.properties}")
 
                 # Store characteristics that might be useful
                 if "read" in char.properties:
@@ -101,7 +104,7 @@ class ChandlerWaterSoftener:
     async def read_device_info(self) -> Dict[str, Any]:
         """Read basic device information"""
         if not self.client or not self.client.is_connected:
-            _LOGGER.error("Not connected to device")
+            _LOGGER.error("[READ] Not connected to device")
             return {}
 
         device_info = {
@@ -127,20 +130,22 @@ class ChandlerWaterSoftener:
                     # Try to decode as string first, then as raw bytes
                     try:
                         device_info[info_type] = data.decode('utf-8').strip()
+                        _LOGGER.info(f"[READ] {info_type}: {device_info[info_type]}")
                     except:
                         if info_type == 'battery_level' and len(data) >= 1:
                             device_info[info_type] = data[0]  # Battery level is usually a single byte
                         else:
                             device_info[info_type] = data.hex()
+                        _LOGGER.info(f"[READ] {info_type}: {device_info[info_type]} (raw)")
             except Exception as e:
-                _LOGGER.debug(f"Could not read {info_type}: {str(e)}")
+                _LOGGER.debug(f"[READ] Could not read {info_type}: {str(e)}")
 
         return device_info
 
     async def read_water_softener_data(self) -> Dict[str, Any]:
         """Read CS_Meter_Soft specific data"""
         if not self.client or not self.client.is_connected:
-            _LOGGER.error("Not connected to device")
+            _LOGGER.error("[READ] Not connected to device")
             return {}
 
         softener_data = {
@@ -163,6 +168,7 @@ class ChandlerWaterSoftener:
                             'length': len(data),
                             'timestamp': datetime.now().isoformat()
                         }
+                        _LOGGER.info(f"[READ] Char {char_uuid}: {data.hex()}")
 
                         # Try to interpret the data for CS_Meter_Soft
                         char_info.update(self._parse_cs_meter_data(data, char_uuid))
@@ -170,10 +176,11 @@ class ChandlerWaterSoftener:
                         softener_data['raw_readings'][char_uuid] = char_info
 
                 except Exception as e:
-                    _LOGGER.debug(f"Could not read characteristic {char_uuid}: {str(e)}")
+                    _LOGGER.debug(f"[READ] Could not read characteristic {char_uuid}: {str(e)}")
 
         # Extract common water softener metrics if identifiable
         softener_data['parsed_data'] = self._extract_softener_metrics(softener_data['raw_readings'])
+        _LOGGER.info(f"[PARSE] Extracted metrics: {softener_data['parsed_data']}")
 
         return softener_data
 
@@ -189,6 +196,7 @@ class ChandlerWaterSoftener:
                     float_val = struct.unpack('<f', data[:4])[0]
                     if -1000 < float_val < 10000:  # Reasonable range check
                         parsed['as_float'] = round(float_val, 2)
+                        _LOGGER.debug(f"[PARSE] {char_uuid} as_float: {parsed['as_float']}")
                 except:
                     pass
 
@@ -197,6 +205,7 @@ class ChandlerWaterSoftener:
                     int_val = struct.unpack('<I', data[:4])[0]
                     if int_val < 1000000:  # Reasonable range
                         parsed['as_uint32'] = int_val
+                        _LOGGER.debug(f"[PARSE] {char_uuid} as_uint32: {parsed['as_uint32']}")
                 except:
                     pass
 
@@ -205,6 +214,7 @@ class ChandlerWaterSoftener:
                 try:
                     int16_val = struct.unpack('<H', data[:2])[0]
                     parsed['as_uint16'] = int16_val
+                    _LOGGER.debug(f"[PARSE] {char_uuid} as_uint16: {parsed['as_uint16']}")
                 except:
                     pass
 
@@ -213,12 +223,14 @@ class ChandlerWaterSoftener:
                 parsed['as_uint8'] = data[0]
                 if data[0] <= 100:
                     parsed['as_percentage'] = data[0]
+                    _LOGGER.debug(f"[PARSE] {char_uuid} as_percentage: {parsed['as_percentage']}")
 
             # Try as ASCII string
             try:
                 str_val = data.decode('ascii').strip()
                 if str_val.isprintable() and len(str_val) > 0:
                     parsed['as_string'] = str_val
+                    _LOGGER.debug(f"[PARSE] {char_uuid} as_string: {parsed['as_string']}")
             except:
                 pass
 
@@ -228,6 +240,7 @@ class ChandlerWaterSoftener:
                 try:
                     val1, val2 = struct.unpack('<II', data)
                     parsed['as_dual_uint32'] = [val1, val2]
+                    _LOGGER.debug(f"[PARSE] {char_uuid} as_dual_uint32: {parsed['as_dual_uint32']}")
                 except:
                     pass
 
@@ -235,9 +248,10 @@ class ChandlerWaterSoftener:
             if char_uuid.endswith('2a19'):  # Battery service
                 if len(data) == 1:
                     parsed['battery_percentage'] = data[0]
+                    _LOGGER.debug(f"[PARSE] {char_uuid} battery_percentage: {parsed['battery_percentage']}")
 
         except Exception as e:
-            _LOGGER.debug(f"Error parsing data for {char_uuid}: {str(e)}")
+            _LOGGER.debug(f"[PARSE] Error parsing data for {char_uuid}: {str(e)}")
 
         return parsed
 
@@ -279,13 +293,14 @@ class ChandlerWaterSoftener:
                     if metrics['water_usage'] is None:
                         metrics['water_usage'] = uint_val
 
+        _LOGGER.debug(f"[PARSE] Final extracted metrics: {metrics}")
         return metrics
 
     async def disconnect(self):
         """Disconnect from the device"""
         if self.client and self.client.is_connected:
             await self.client.disconnect()
-            _LOGGER.info("Disconnected from device")
+            _LOGGER.info("[DISCONNECT] Disconnected from device")
 
 
 class ChandlerWaterSoftenerAPI:
@@ -297,31 +312,38 @@ class ChandlerWaterSoftenerAPI:
 
     async def initialize(self, device_address: Optional[str] = None) -> Dict[str, Any]:
         """Initialize connection to CS_Meter_Soft water softener"""
+        _LOGGER.info(f"[API] Initializing connection to CS_Meter_Soft (address={device_address})")
         if not device_address:
             # Scan for CS_Meter_Soft devices
             devices = await self.softener.scan_for_devices()
             if not devices:
+                _LOGGER.warning("[API] No CS_Meter_Soft devices found during initialization.")
                 return {'error': 'No CS_Meter_Soft devices found', 'devices': []}
 
             # Auto-connect to first CS_Meter_Soft device found
             device_address = devices[0]['address']
-            _LOGGER.info(f"Auto-connecting to CS_Meter_Soft: {devices[0]['name']} ({device_address})")
+            _LOGGER.info(f"[API] Auto-connecting to CS_Meter_Soft: {devices[0]['name']} ({device_address})")
 
         self.connected = await self.softener.connect(device_address)
 
         if self.connected:
             device_info = await self.softener.read_device_info()
+            _LOGGER.info(f"[API] Connected. Device info: {device_info}")
             return {'status': 'connected', 'device_info': device_info, 'device_type': 'CS_Meter_Soft'}
         else:
+            _LOGGER.error(f"[API] Failed to connect to CS_Meter_Soft at {device_address}")
             return {'error': 'Failed to connect to CS_Meter_Soft', 'device_address': device_address}
 
     async def get_status(self) -> Dict[str, Any]:
         """Get current water softener status and readings"""
         if not self.connected:
+            _LOGGER.error("[API] Not connected to device when calling get_status.")
             return {'error': 'Not connected to device'}
 
         try:
             data = await self.softener.read_water_softener_data()
+            _LOGGER.info(f"[API] get_status data: {data}")
             return {'status': 'success', 'data': data}
         except Exception as e:
+            _LOGGER.error(f"[API] Failed to read data: {str(e)}")
             return {'error': f'Failed to read data: {str(e)}'} 

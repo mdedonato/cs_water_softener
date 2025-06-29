@@ -33,31 +33,21 @@ class ChandlerWaterSoftener:
         _LOGGER.info(f"[SCAN] Entering scan_for_devices(timeout={timeout})")
         devices = await BleakScanner.discover(timeout=timeout)
         _LOGGER.debug(f"[SCAN] Found {len(devices)} BLE devices.")
-        chandler_devices = []
-
+        all_devices = []
         for device in devices:
             name = getattr(device, 'name', None)
             address = getattr(device, 'address', None)
             rssi = getattr(device, 'rssi', None)
             _LOGGER.debug(f"[SCAN] Device: name={name}, address={address}, rssi={rssi}")
-            if name and any(keyword in name for keyword in ['CS_Meter_Soft', 'CS_Meter', 'chandler', 'Chandler']):
-                chandler_devices.append({
-                    'name': name,
-                    'address': address,
-                    'rssi': rssi
-                })
-                rssi_str = f" RSSI: {rssi}" if rssi is not None else ""
-                _LOGGER.info(f"[SCAN] Found Chandler device: {name} ({address}){rssi_str}")
-
-        if not chandler_devices:
-            _LOGGER.warning("[SCAN] No CS_Meter_Soft devices found. Here are all discovered devices:")
-            for device in devices:
-                name = getattr(device, 'name', None)
-                address = getattr(device, 'address', None)
-                rssi = getattr(device, 'rssi', None)
-                _LOGGER.info(f"[SCAN]   name={name}, address={address}, rssi={rssi}")
-        _LOGGER.info(f"[SCAN] Exiting scan_for_devices, found {len(chandler_devices)} Chandler devices.")
-        return chandler_devices
+            all_devices.append({
+                'name': name,
+                'address': address,
+                'rssi': rssi
+            })
+        if not all_devices:
+            _LOGGER.warning("[SCAN] No BLE devices found.")
+        _LOGGER.info(f"[SCAN] Exiting scan_for_devices, found {len(all_devices)} devices.")
+        return all_devices
 
     async def connect(self, device_address: str) -> bool:
         """Connect to the water softener device"""

@@ -76,13 +76,13 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         errors={"base": "no_devices_found"},
                     )
 
-                # Show ALL discovered devices (not just Chandler)
+                # Add manual entry option
                 self.discovered_devices = {
                     f"{device['name'] or 'Unknown'} ({device['address']})": device['address']
                     for device in devices
                 }
+                self.discovered_devices["Manual Entry"] = "MANUAL_ENTRY"
 
-                # Show device selection
                 return self.async_show_form(
                     step_id="scan",
                     data_schema=vol.Schema(
@@ -107,6 +107,8 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # User selected a device
         selected_device = user_input["device"]
+        if self.discovered_devices[selected_device] == "MANUAL_ENTRY":
+            return await self.async_step_manual_entry()
         device_address = self.discovered_devices[selected_device]
         device_name = selected_device.split(" (")[0]
 
@@ -148,6 +150,52 @@ class ChandlerWaterSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
                 errors={"base": "connection_failed"},
             )
+
+    async def async_step_manual_entry(self, user_input=None):
+        if user_input is not None:
+            device_address = user_input["manual_address"]
+            device_name = device_address
+            # Try to connect to verify the device
+            try:
+                connected = await self.api.softener.connect(device_address)
+                if not connected:
+                    return self.async_show_form(
+                        step_id="manual_entry",
+                        data_schema=vol.Schema(
+                            {
+                                vol.Required("manual_address"): str,
+                            }
+                        ),
+                        errors={"base": "connection_failed"},
+                    )
+                await self.api.softener.disconnect()
+                return self.async_create_entry(
+                    title=self.user_input.get(CONF_NAME, device_name),
+                    data={
+                        CONF_DEVICE_ADDRESS: device_address,
+                        CONF_DEVICE_NAME: device_name,
+                        CONF_SCAN_TIMEOUT: self.user_input.get(CONF_SCAN_TIMEOUT, DEFAULT_SCAN_TIMEOUT),
+                    },
+                )
+            except Exception as err:
+                _LOGGER.error("Error connecting to device: %s", err)
+                return self.async_show_form(
+                    step_id="manual_entry",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required("manual_address"): str,
+                        }
+                    ),
+                    errors={"base": "connection_failed"},
+                )
+        return self.async_show_form(
+            step_id="manual_entry",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("manual_address"): str,
+                }
+            ),
+        )
 
     async def async_step_import(self, import_info: dict[str, Any]) -> FlowResult:
         """Handle import from configuration.yaml."""

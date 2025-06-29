@@ -272,10 +272,13 @@ tmp/
 logs/
 
 # Test files
-test_*.py
-*_test.py
 tests/
-.pytest_cache/
++.pytest_cache/
+
+# Ignore test files in subdirectories, but allow top-level test scripts
+**/test_*.py
+**/*_test.py
+!test_bluetooth_scan.py
 
 # Documentation build
 docs/_build/

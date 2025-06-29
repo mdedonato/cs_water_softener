@@ -1,5 +1,9 @@
 # Chandler Water Softener Home Assistant Integration
 
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
+[![maintainer](https://img.shields.io/badge/maintainer-%40your--username-blue.svg)](https://github.com/your-username)
+[![Community Forum](https://img.shields.io/badge/community-forum-brightgreen.svg)](https://community.home-assistant.io/)
+
 A Home Assistant integration for Chandler Systems CS_Meter_Soft water softener devices that communicate via Bluetooth Low Energy (BLE).
 
 ## Features
@@ -18,7 +22,24 @@ A Home Assistant integration for Chandler Systems CS_Meter_Soft water softener d
 
 ## Installation
 
-### Method 1: Manual Installation (Recommended)
+### Method 1: HACS Installation (Recommended)
+
+1. **Install HACS** (if you haven't already):
+   - Follow the [HACS installation guide](https://hacs.xyz/docs/installation/installation/)
+
+2. **Add this repository to HACS**:
+   - Go to HACS → Integrations
+   - Click the "+" button (bottom right)
+   - Search for "Chandler Water Softener"
+   - Click "Download"
+
+3. **Add the Integration**:
+   - Go to Settings → Devices & Services
+   - Click "Add Integration"
+   - Search for "Chandler Water Softener"
+   - Follow the setup wizard
+
+### Method 2: Manual Installation
 
 1. **Download the Integration**:
    - Clone or download this repository
@@ -42,10 +63,6 @@ A Home Assistant integration for Chandler Systems CS_Meter_Soft water softener d
    - Click "Add Integration"
    - Search for "Chandler Water Softener"
    - Follow the setup wizard
-
-### Method 2: HACS Installation (Future)
-
-This integration may be available through HACS in the future.
 
 ## Configuration
 

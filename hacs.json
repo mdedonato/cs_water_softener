@@ -1,0 +1,7 @@
+{
+  "name": "Chandler Water Softener",
+  "render_readme": true,
+  "domains": ["chandler_water_softener"],
+  "homeassistant": "2023.8.0",
+  "iot_class": "Local Push"
+} 

@@ -53,23 +53,29 @@ class ChandlerWaterSoftener:
         """Connect to the water softener device"""
         _LOGGER.info(f"[CONNECT] Entering connect(device_address={device_address})")
         try:
-            _LOGGER.info(f"[CONNECT] Connecting to device: {device_address}")
+            _LOGGER.debug(f"[CONNECT] Creating BleakClient for {device_address}")
             self.client = BleakClient(device_address)
+            _LOGGER.debug(f"[CONNECT] BleakClient created: {self.client}")
+            _LOGGER.debug(f"[CONNECT] Attempting to connect to {device_address}")
             await self.client.connect()
-
+            _LOGGER.debug(f"[CONNECT] connect() call finished. is_connected={getattr(self.client, 'is_connected', None)}")
             if self.client.is_connected:
                 self.device_address = device_address
                 _LOGGER.info("[CONNECT] Successfully connected!")
+                _LOGGER.debug(f"[CONNECT] Client state after connect: {self.client}")
+                _LOGGER.debug(f"[CONNECT] Attempting to discover services...")
                 await self._discover_services()
+                _LOGGER.debug(f"[CONNECT] Service discovery complete.")
                 _LOGGER.info("[CONNECT] Exiting connect: success")
                 return True
             else:
-                _LOGGER.error("[CONNECT] Failed to connect")
+                _LOGGER.error("[CONNECT] Failed to connect (is_connected is False)")
+                _LOGGER.debug(f"[CONNECT] Client state after failed connect: {self.client}")
                 _LOGGER.info("[CONNECT] Exiting connect: failure")
                 return False
-
         except Exception as e:
             _LOGGER.error(f"[CONNECT] Connection error: {str(e)}")
+            _LOGGER.debug(f"[CONNECT] Exception details:", exc_info=True)
             _LOGGER.info("[CONNECT] Exiting connect: exception")
             return False
 
@@ -80,24 +86,27 @@ class ChandlerWaterSoftener:
             _LOGGER.warning("[DISCOVER] No client to discover services on.")
             _LOGGER.info("[DISCOVER] Exiting _discover_services: no client")
             return
-
-        _LOGGER.info("[DISCOVER] Discovering services and characteristics...")
-        services = self.client.services
-
-        for service in services:
-            _LOGGER.info(f"[DISCOVER] Service: {service.uuid}")
-            for char in service.characteristics:
-                _LOGGER.info(f"[DISCOVER]   Characteristic: {char.uuid} - Properties: {char.properties}")
-
-                # Store characteristics that might be useful
-                if "read" in char.properties:
-                    self.characteristics[f"read_{len(self.characteristics)}"] = char.uuid
-                if "write" in char.properties:
-                    self.characteristics[f"write_{len(self.characteristics)}"] = char.uuid
-                if "notify" in char.properties:
-                    self.characteristics[f"notify_{len(self.characteristics)}"] = char.uuid
-
-        _LOGGER.info("[DISCOVER] Exiting _discover_services")
+        try:
+            _LOGGER.debug(f"[DISCOVER] Client state before service discovery: {self.client}")
+            services = self.client.services
+            _LOGGER.debug(f"[DISCOVER] Discovered services: {services}")
+            for service in services:
+                _LOGGER.info(f"[DISCOVER] Service: {service.uuid}")
+                for char in service.characteristics:
+                    _LOGGER.info(f"[DISCOVER]   Characteristic: {char.uuid} - Properties: {char.properties}")
+                    if "read" in char.properties:
+                        self.characteristics[f"read_{len(self.characteristics)}"] = char.uuid
+                    if "write" in char.properties:
+                        self.characteristics[f"write_{len(self.characteristics)}"] = char.uuid
+                    if "notify" in char.properties:
+                        self.characteristics[f"notify_{len(self.characteristics)}"] = char.uuid
+            _LOGGER.debug(f"[DISCOVER] Characteristics map: {self.characteristics}")
+            _LOGGER.info("[DISCOVER] Exiting _discover_services: success")
+        except Exception as e:
+            _LOGGER.error(f"[DISCOVER] Error during service discovery: {str(e)}")
+            _LOGGER.debug(f"[DISCOVER] Exception details:", exc_info=True)
+            _LOGGER.info("[DISCOVER] Exiting _discover_services: exception")
+            return
 
     async def read_device_info(self) -> Dict[str, Any]:
         """Read basic device information"""

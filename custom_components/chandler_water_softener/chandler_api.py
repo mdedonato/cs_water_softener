@@ -52,6 +52,10 @@ class ChandlerWaterSoftener:
     async def connect(self, device_address: str) -> bool:
         """Connect to the water softener device"""
         _LOGGER.info(f"[CONNECT] Entering connect(device_address={device_address})")
+        if not device_address:
+            _LOGGER.error("[CONNECT] No device address provided, cannot create BleakClient.")
+            _LOGGER.info("[CONNECT] Exiting connect: no address")
+            return False
         try:
             _LOGGER.debug(f"[CONNECT] Creating BleakClient for {device_address}")
             self.client = BleakClient(device_address)
